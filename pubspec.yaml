@@ -1,0 +1,14 @@
+name: dartcore
+description: A simple, yet powerful Flask alternative for Dart
+version: 0.0.1
+repository: https://github.com/neoapps-dev/dartcore
+
+environment:
+  sdk: ^3.5.3
+dependencies:
+  http_parser: ^4.1.0
+  mime: ^2.0.0
+  # path: ^1.8.0
+
+dev_dependencies:
+  lints: ^4.0.0
