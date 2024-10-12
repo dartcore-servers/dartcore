@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:mime/mime.dart';
 
-const version = '0.0.1';
+const version = '0.0.2';
 
 typedef Handler = Future<void> Function(HttpRequest request);
 typedef Middleware = Future<void> Function(HttpRequest request, Function next);
@@ -14,12 +14,20 @@ class App {
   late Function(HttpRequest request)? _custom404;
   late Function(HttpRequest request, Object error)? _custom500;
 
+  final Map<String, int> _requestCounts = {};
+  int _maxRequestsPerMinute = 60;
+  // final Duration _rateLimitDuration = Duration(minutes: 1);              // TODO
+
   void route(String method, String path, Handler handler) {
     _routes.putIfAbsent(method, () => {})[path] = handler;
   }
 
   void use(Middleware middleware) {
     _middlewares.add(middleware);
+  }
+
+  void setRateLimit(int maxlimit) {
+    _maxRequestsPerMinute = maxlimit;
   }
 
   void group(String prefix, void Function(App group) registerRoutes) {
@@ -32,9 +40,10 @@ class App {
     });
   }
 
-  Future<void> start({String address = 'localhost', int port = 8080}) async {
+  Future<void> start({String address = '0.0.0.0', int port = 8080}) async {
     var server = await HttpServer.bind(address, port);
-    print('[dartcore] Server running on $address:$port');
+    print(
+        '[dartcore] Server running on ${address.replaceFirst('0.0.0.0', 'All IP Addresses on port ')}:$port');
     await for (HttpRequest request in server) {
       await _handleRequest(request);
     }
@@ -43,19 +52,39 @@ class App {
   Future<void> _handleRequest(HttpRequest request) async {
     final path = request.uri.path;
     final method = request.method;
+
+    _applyCorsHeaders(request);
+
     await _runMiddlewares(request, () async {
-      try {
-        final handler = _findHandler(method, path);
-        if (handler != null) {
-          await handler(request);
-          print('[dartcore] $method $path --> ${request.response.statusCode}');
-        } else {
-          _custom404?.call(request) ?? _handle404(request);
-        }
-      } catch (e) {
-        _custom500?.call(request, e) ?? _handle500(request, e);
+      final clientIp =
+          request.connectionInfo?.remoteAddress.address ?? 'unknown';
+      if (_isRateLimited(clientIp)) {
+        _handleRateLimit(request);
+        return;
+      }
+
+      final handler = _findHandler(method, path);
+      if (handler != null) {
+        await handler(request);
+        print('[dartcore] $method $path --> ${request.response.statusCode}');
+      } else {
+        _custom404?.call(request) ?? _handle404(request);
       }
     });
+  }
+
+  void _applyCorsHeaders(HttpRequest request) {
+    request.response.headers
+        .add(HttpHeaders.accessControlAllowOriginHeader, '*');
+    request.response.headers.add(HttpHeaders.accessControlAllowMethodsHeader,
+        'GET, POST, PUT, DELETE, OPTIONS');
+    request.response.headers.add(HttpHeaders.accessControlAllowHeadersHeader,
+        'Content-Type, Authorization');
+    if (request.method == 'OPTIONS') {
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..close();
+    }
   }
 
   Future<void> _runMiddlewares(HttpRequest request, Function next) async {
@@ -70,6 +99,24 @@ class App {
     }
 
     await nextMiddleware();
+  }
+
+  bool _isRateLimited(String clientIp) {
+    final currentTime = DateTime.now();
+    _requestCounts.removeWhere((ip, count) =>
+        currentTime
+            .difference(DateTime.fromMillisecondsSinceEpoch(count))
+            .inMinutes >=
+        1);
+    _requestCounts[clientIp] = (_requestCounts[clientIp] ?? 0) + 1;
+    return _requestCounts[clientIp]! > _maxRequestsPerMinute;
+  }
+
+  void _handleRateLimit(HttpRequest request) {
+    request.response
+      ..statusCode = HttpStatus.tooManyRequests
+      ..write('Rate limit exceeded\n[dartcore v$version]')
+      ..close();
   }
 
   Handler? _findHandler(String method, String path) {
@@ -98,7 +145,7 @@ class App {
   }
 
   void _handle404(HttpRequest request) {
-    request.response
+    _custom404 != null ? _custom404!(request) : request.response
       ..statusCode = HttpStatus.notFound
       ..write('404 Not Found\n[dartcore v$version]')
       ..close();
@@ -106,7 +153,7 @@ class App {
   }
 
   void _handle500(HttpRequest request, Object error) {
-    request.response
+    _custom500 != null ? _custom500!(request, error) : request.response
       ..statusCode = HttpStatus.internalServerError
       ..write('500 Internal Server Error\n[dartcore v$version]')
       ..close();
@@ -151,7 +198,7 @@ class App {
     return request.uri.queryParameters;
   }
 
-  Future<void> parseMultipartRequest(HttpRequest request) async {
+  Future<void> parseMultipartRequest(HttpRequest request, String saveTo) async {
     if (request.headers.contentType?.mimeType == 'multipart/form-data') {
       final boundary = request.headers.contentType?.parameters['boundary'];
       if (boundary == null) {
@@ -166,11 +213,11 @@ class App {
           final contentDisposition =
               HeaderValue.parse(part.headers['content-disposition']!);
           final filename = contentDisposition.parameters['filename'];
-          final file = File('uploads/$filename');
+          final file = File('$saveTo/$filename');
           final sink = file.openWrite();
           await part.pipe(sink);
           await sink.close();
-          print('File uploaded: $filename');
+          print('[dartcore] File uploaded: $filename');
         }
       }
     } else {
