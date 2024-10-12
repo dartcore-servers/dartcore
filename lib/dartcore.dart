@@ -12,8 +12,6 @@ typedef Handler = Future<void> Function(HttpRequest request);
 /// Defines Middleware type
 typedef Middleware = Future<void> Function(HttpRequest request, Function next);
 
-void main() {} // for WASM compatibility
-
 /// dotcore App class for routing and handling HTTP requests
 class App {
   final Map<String, Map<String, Handler>> _routes = {};

@@ -16,3 +16,9 @@
 - Longer description on pub.dev
 - WASM compatibility
 - Added documentation for each method :)
+
+## 0.0.4
+
+- A bit shorter description on pub.dev
+- WASM or Web doesn't work.
+- More pub points lmao
