@@ -3,11 +3,18 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:mime/mime.dart';
 
-const version = '0.0.2';
+/// dotcore's version
+const version = '0.0.3';
 
+/// Defines Handler type
 typedef Handler = Future<void> Function(HttpRequest request);
+
+/// Defines Middleware type
 typedef Middleware = Future<void> Function(HttpRequest request, Function next);
 
+void main() {} // for WASM compatibility
+
+/// dotcore App class for routing and handling HTTP requests
 class App {
   final Map<String, Map<String, Handler>> _routes = {};
   final List<Middleware> _middlewares = [];
@@ -18,18 +25,23 @@ class App {
   int _maxRequestsPerMinute = 60;
   // final Duration _rateLimitDuration = Duration(minutes: 1);              // TODO
 
+  /// Adds a new route for the HTTP server
   void route(String method, String path, Handler handler) {
     _routes.putIfAbsent(method, () => {})[path] = handler;
   }
+
+  /// Uses a middleware (A script that runs before a request is handled)
 
   void use(Middleware middleware) {
     _middlewares.add(middleware);
   }
 
+  /// Sets the rate limit per minute
   void setRateLimit(int maxlimit) {
     _maxRequestsPerMinute = maxlimit;
   }
 
+  /// Adds a group of routes (e.g. /api has /posts which means /api/posts)
   void group(String prefix, void Function(App group) registerRoutes) {
     var groupApp = App();
     registerRoutes(groupApp);
@@ -39,6 +51,8 @@ class App {
       });
     });
   }
+
+  /// Starts the server with Address and a Port (defaults: Address: ALL, Port: 8080)
 
   Future<void> start({String address = '0.0.0.0', int port = 8080}) async {
     var server = await HttpServer.bind(address, port);
@@ -160,14 +174,17 @@ class App {
     print('[dartcore] ${request.method} ${request.uri.path} --> 500: $error');
   }
 
+  /// Sets a custom 404 error
   void set404(Function(HttpRequest request) handler) {
     _custom404 = handler;
   }
 
+  /// sets a custom 500 error
   void set500(Function(HttpRequest request, Object error) handler) {
     _custom500 = handler;
   }
 
+  /// Sends a json response
   Future<void> sendJson(HttpRequest request, Map<String, dynamic> data) async {
     request.response
       ..headers.contentType = ContentType.json
@@ -175,9 +192,13 @@ class App {
       ..close();
   }
 
+  /// Sets a header to the response
+
   void setHeader(HttpRequest request, String key, String value) {
     request.response.headers.set(key, value);
   }
+
+  /// Serves a static file
 
   Future<void> serveStaticFile(HttpRequest request, String filePath) async {
     final file = File(filePath);
@@ -189,14 +210,20 @@ class App {
     }
   }
 
+  /// Parses a JSON from the request body
+
   Future<Map<String, dynamic>> parseJson(HttpRequest request) async {
     final content = await utf8.decoder.bind(request).join();
     return jsonDecode(content) as Map<String, dynamic>;
   }
 
+  /// Gets query parameters (e.g. getQueryParams(request)['name'])
+
   Map<String, String> getQueryParams(HttpRequest request) {
     return request.uri.queryParameters;
   }
+
+  /// Parses Multipart Requests, useful for adding upload a file
 
   Future<void> parseMultipartRequest(HttpRequest request, String saveTo) async {
     if (request.headers.contentType?.mimeType == 'multipart/form-data') {
@@ -225,6 +252,8 @@ class App {
     }
   }
 
+  /// Serves a file, useful for downloading a file
+
   Future<void> sendFile(HttpRequest request, File file) async {
     if (await file.exists()) {
       request.response.headers.contentType = ContentType.binary;
@@ -233,6 +262,8 @@ class App {
       _handle404(request);
     }
   }
+
+  /// Sends an HTML data
 
   Future<void> sendHtml(HttpRequest request, String htmlContent) async {
     request.response

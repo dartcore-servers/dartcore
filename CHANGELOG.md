@@ -10,3 +10,9 @@
 - Added 0.0.0.0 support
 - Added Rate limit support (Uses Memory for now)
 - Added multipart support
+
+## 0.0.3
+
+- Longer description on pub.dev
+- WASM compatibility
+- Added documentation for each method :)
