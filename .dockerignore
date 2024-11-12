@@ -1,0 +1,4 @@
+# Ignore the build and cache folders
+build/
+.packages
+.dart_tool/

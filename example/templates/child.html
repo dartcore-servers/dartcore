@@ -1,0 +1,30 @@
+{% extends "templates/hello.html" %}
+
+{% block title %}User Dashboard{% endblock %}
+
+{% block header %}Hello, {{ name }}!{% endblock %}
+
+{% block content %}
+    <p>Welcome to your dashboard, {{ name }}. Here are some details:</p>
+    
+    {% if showDetails %}
+        <section>
+            <h2>Your Info</h2>
+            <ul>
+                <li>Email: {{ email }}</li>
+                <li>Subscription Level: {{ subscription }}</li>
+            </ul>
+        </section>
+    {% endif %}
+
+    {% if showItems %}
+        <section>
+            <h2>Your Items</h2>
+            <ul>
+                {% for item in items %}
+                    <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+{% endblock %}

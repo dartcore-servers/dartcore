@@ -22,3 +22,15 @@
 - A bit shorter description on pub.dev
 - WASM or Web doesn't work.
 - More pub points lmao
+
+## 0.0.5
+
+- Added a Template Engine ( supports basic variables, if conditions, loops, and inheritance (extending) )
+- Added API Key System
+- Added Config support (as JSON, helps reduce repeated parts of the code)
+- Added `app.send(request, content, contentType);`
+- Added onShutdown and onStartup events
+- Added Custom Events with an Event emitter and receiver
+- Added `app.shutdown();` to gracefully shutdown the server
+- Added Caching for responses
+- Now RateLimter uses Storage instead of memory, also encrypts it with a password

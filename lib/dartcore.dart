@@ -1,64 +1,88 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:dartcore/apikeymanager.dart';
+import 'package:dartcore/cache.dart';
+import 'package:dartcore/config.dart';
+import 'package:dartcore/event_emitter.dart';
+import 'package:dartcore/rate_limiter.dart';
+import 'package:dartcore/template_engine.dart';
 import 'package:mime/mime.dart';
 
-/// dotcore's version
-const version = '0.0.3';
+/// dartcore's version
+const version = '0.0.5';
 
-/// Defines Handler type
+/// Defines Handler
 typedef Handler = Future<void> Function(HttpRequest request);
 
-/// Defines Middleware type
+/// Defines Middleware
 typedef Middleware = Future<void> Function(HttpRequest request, Function next);
 
-/// dotcore App class for routing and handling HTTP requests
+/// App class, almost the most important class.
 class App {
+  HttpServer? _server;
+  Config? _config;
+  final EventEmitter _eventEmitter = EventEmitter();
+  TemplateEngine? _templateEngine;
+  final Cache _cache = Cache();
   final Map<String, Map<String, Handler>> _routes = {};
   final List<Middleware> _middlewares = [];
-  late Function(HttpRequest request)? _custom404;
-  late Function(HttpRequest request, Object error)? _custom500;
+  Function(HttpRequest request)? _custom404;
+  Function(HttpRequest request, Object error)? _custom500;
 
-  final Map<String, int> _requestCounts = {};
-  int _maxRequestsPerMinute = 60;
-  // final Duration _rateLimitDuration = Duration(minutes: 1);              // TODO
+  RateLimiter? _rateLimiter;
 
-  /// Adds a new route for the HTTP server
+  /// Constructor
+  App(String configPath) {
+    _config = Config(configPath);
+    _templateEngine = TemplateEngine();
+    _rateLimiter = RateLimiter(
+      storagePath: './rate_limits.dartcorelimits',
+      maxRequests: 60,
+      resetDuration: Duration(minutes: 1),
+      encryptionPassword:
+          "dartcore", // Don't keep it unless it's a private server, recommend changing it
+    );
+  }
+
+  /// Sets a custom rate limiter
+  void setRateLimiter(RateLimiter ratelimiter) {
+    _rateLimiter = ratelimiter;
+  }
+
+  /// Returns dartcore's version
+  String getVersion() {
+    return version;
+  }
+
+  /// Routing function
+
   void route(String method, String path, Handler handler) {
     _routes.putIfAbsent(method, () => {})[path] = handler;
   }
 
-  /// Uses a middleware (A script that runs before a request is handled)
+  /// Using middleware function
 
   void use(Middleware middleware) {
     _middlewares.add(middleware);
   }
 
-  /// Sets the rate limit per minute
-  void setRateLimit(int maxlimit) {
-    _maxRequestsPerMinute = maxlimit;
-  }
-
-  /// Adds a group of routes (e.g. /api has /posts which means /api/posts)
-  void group(String prefix, void Function(App group) registerRoutes) {
-    var groupApp = App();
-    registerRoutes(groupApp);
-    groupApp._routes.forEach((method, routes) {
-      routes.forEach((path, handler) {
-        route(method, '$prefix$path', handler);
-      });
-    });
-  }
-
-  /// Starts the server with Address and a Port (defaults: Address: ALL, Port: 8080)
+  /// Starts the server
 
   Future<void> start({String address = '0.0.0.0', int port = 8080}) async {
-    var server = await HttpServer.bind(address, port);
+    _server = await HttpServer.bind(address, port);
     print(
         '[dartcore] Server running on ${address.replaceFirst('0.0.0.0', 'All IP Addresses on port ')}:$port');
-    await for (HttpRequest request in server) {
+    emit('serverStarted', {'address': address, 'port': port});
+
+    await for (HttpRequest request in _server!) {
       await _handleRequest(request);
     }
+  }
+
+  /// Get configuration
+  dynamic getFromConfig(String key) {
+    return _config?.get(key);
   }
 
   Future<void> _handleRequest(HttpRequest request) async {
@@ -70,7 +94,7 @@ class App {
     await _runMiddlewares(request, () async {
       final clientIp =
           request.connectionInfo?.remoteAddress.address ?? 'unknown';
-      if (_isRateLimited(clientIp)) {
+      if (_rateLimiter!.isRateLimited(clientIp)) {
         _handleRateLimit(request);
         return;
       }
@@ -113,17 +137,6 @@ class App {
     await nextMiddleware();
   }
 
-  bool _isRateLimited(String clientIp) {
-    final currentTime = DateTime.now();
-    _requestCounts.removeWhere((ip, count) =>
-        currentTime
-            .difference(DateTime.fromMillisecondsSinceEpoch(count))
-            .inMinutes >=
-        1);
-    _requestCounts[clientIp] = (_requestCounts[clientIp] ?? 0) + 1;
-    return _requestCounts[clientIp]! > _maxRequestsPerMinute;
-  }
-
   void _handleRateLimit(HttpRequest request) {
     request.response
       ..statusCode = HttpStatus.tooManyRequests
@@ -164,20 +177,12 @@ class App {
     print('[dartcore] ${request.method} ${request.uri.path} --> 404');
   }
 
-  void _handle500(HttpRequest request, Object error) {
-    _custom500 != null ? _custom500!(request, error) : request.response
-      ..statusCode = HttpStatus.internalServerError
-      ..write('500 Internal Server Error\n[dartcore v$version]')
-      ..close();
-    print('[dartcore] ${request.method} ${request.uri.path} --> 500: $error');
-  }
-
-  /// Sets a custom 404 error
+  /// Sets a custom 404 Message
   void set404(Function(HttpRequest request) handler) {
     _custom404 = handler;
   }
 
-  /// sets a custom 500 error
+  /// Sets a custom 500 Message
   void set500(Function(HttpRequest request, Object error) handler) {
     _custom500 = handler;
   }
@@ -194,6 +199,14 @@ class App {
 
   void setHeader(HttpRequest request, String key, String value) {
     request.response.headers.set(key, value);
+  }
+
+  void _handle500(HttpRequest request, Object error) {
+    _custom500 != null ? _custom500!(request, error) : request.response
+      ..statusCode = HttpStatus.internalServerError
+      ..write('500 Internal Server Error\n[dartcore v$version]')
+      ..close();
+    print('[dartcore] ${request.method} ${request.uri.path} --> 500: $error');
   }
 
   /// Serves a static file
@@ -268,5 +281,113 @@ class App {
       ..headers.contentType = ContentType.html
       ..write(htmlContent)
       ..close();
+  }
+
+  /// Sends a data with a custom type
+
+  Future<void> send(
+      HttpRequest request, String content, ContentType contentType) async {
+    request.response
+      ..headers.contentType = contentType
+      ..write(content)
+      ..close();
+  }
+
+  /// Renders a template and sends it as a response
+  Future<void> renderTemplate(HttpRequest request, String templatePath,
+      Map<String, dynamic> context) async {
+    try {
+      String renderedTemplate =
+          await _templateEngine!.render(templatePath, context);
+      request.response
+        ..headers.contentType = ContentType.html
+        ..write(renderedTemplate)
+        ..close();
+    } catch (e) {
+      _handle500(request, e);
+    }
+  }
+
+  /// Middleware to handle errors
+  Middleware errorHandlingMiddleware() {
+    return (HttpRequest request, Function next) async {
+      try {
+        await next(); // Continue to the next middleware or route handler
+      } catch (e, stackTrace) {
+        _handleError(request, e, stackTrace);
+      }
+    };
+  }
+
+  /// Handle errors and respond to the client
+  void _handleError(HttpRequest request, Object error, StackTrace stackTrace) {
+    print('[dartcore] Error: $error\nStackTrace: $stackTrace');
+    request.response
+      ..statusCode = HttpStatus.internalServerError
+      ..write('500 Internal Server Error\n[dartcore v$version]')
+      ..close();
+  }
+
+  /// Caches a response
+  void cacheResponse(String key, dynamic value) {
+    _cache.set(key, value);
+  }
+
+  /// Retrieves a cached response
+  dynamic getCachedResponse(String key) {
+    return _cache.get(key);
+  }
+
+  /// Adds an event listener
+  void on(String event, Function(dynamic) listener) {
+    _eventEmitter.on(event, listener);
+  }
+
+  /// Emits an event
+  void emit(String event, [dynamic data]) {
+    _eventEmitter.emit(event, data);
+  }
+
+  /// Gracefully shuts down the server
+  Future<void> shutdown() async {
+    if (_server != null) {
+      await _server!.close();
+      print('[dartcore] Server shutdown.');
+      emit('serverShutdown', {'message': 'Server has been shut down.'});
+    }
+  }
+
+  /// API Key Middleware
+  Middleware apiKeyMiddleware(ApiKeyManager apiKeyManager) {
+    return (HttpRequest request, Function next) async {
+      final apiKey = request.headers['x-api-key']?.first;
+
+      if (apiKey == null || !apiKeyManager.validateApiKey(apiKey)) {
+        request.response
+          ..statusCode = HttpStatus.forbidden
+          ..write('Invalid or missing API key\n[dartcore $version]')
+          ..close();
+        return;
+      }
+
+      await next();
+    };
+  }
+
+  /// Sets up a basic API key management routes
+
+  void setupApiKeyRoutes(App app, ApiKeyManager apiKeyManager) {
+    app.route('POST', '/api-keys', (HttpRequest request) async {
+      final newApiKey = apiKeyManager.generateApiKey();
+      await app.sendJson(request, {'apiKey': newApiKey.key});
+    });
+
+    app.route('DELETE', '/api-keys/:key', (HttpRequest request) async {
+      final key = request.uri.pathSegments.last;
+      apiKeyManager.revokeApiKey(key);
+      request.response
+        ..statusCode = HttpStatus.noContent
+        ..close();
+    });
   }
 }
