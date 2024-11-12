@@ -1,5 +1,5 @@
 # DartCore
-**DartCore** is a minimalist, yet powerful HTTP server framework for the Dart programming language. It provides a simple API for routing and handling HTTP requests, making it perfect for lightweight web applications, APIs, or microservices.
+**DartCore** is a minimalist, yet powerful HTTP server framework for the Dart programming language. It provides a simple API for routing and handling HTTP requests, making it perfect for lightweight (not very, can be used for complex ones that will never crash) web applications, APIs, or microservices.
 
 ## Features
 - Simple and intuitive routing
