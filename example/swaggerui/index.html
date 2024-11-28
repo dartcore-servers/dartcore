@@ -1,0 +1,34 @@
+<!-- HTML for static distribution bundle build -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="/swagger-ui.css" />
+    <link rel="stylesheet" type="text/css" href="index.css" />
+    <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16" />
+    <!-- BEGIN DARTCORE-SPECIFIC STUFF -->
+    <style>
+      .swagger-ui .topbar {
+        display: none
+      } 
+      .opblock .opblock-summary-path-description-wrapper {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 10px;
+        padding: 0 10px;
+        width: 100%;
+      } 
+    </style>
+    <!-- END DARTCORE-SPECIFIC STUFF -->
+  </head>
+
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-bundle.js" charset="UTF-8"> </script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3/swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+    <script src="/swagger-initializer.js" charset="UTF-8"> </script>
+  </body>
+</html>

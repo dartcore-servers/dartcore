@@ -1,21 +1,37 @@
 import 'dart:io';
 import 'package:dartcore/apikeymanager.dart';
+import 'package:dartcore/blocker.dart';
+import 'package:dartcore/custom_types.dart';
 import 'package:dartcore/dartcore.dart' as dartcore;
+
+import 'package:dartcore/annotation.dart';
+import 'package:dartcore/debug.dart';
 import 'package:dartcore/rate_limiter.dart';
 
-void main() async {
-  var app = dartcore.App(
-      "./config.json"); // optional to inculde config, but might helps in removing repeated parts of the code
-  final apiKeyManager = ApiKeyManager();
+final app = dartcore.App(debug: true, metadata: {
+  "version": "1.0.0",
+  "description": "Dartcore Example",
+  "title": "Example",
+}); // optional to inculde config, but might helps in removing repeated parts of the code
+final apiKeyManager = ApiKeyManager();
+final IPBlocker ipBlocker = IPBlocker();
+final CountryBlocker countryBlocker = CountryBlocker();
+final RateLimiter rateLimiter = RateLimiter(
+    shouldDisplayCaptcha: true,
+    storagePath: "./ratelimits",
+    maxRequests: 99,
+    resetDuration: Duration(hours: 1),
+    encryptionPassword: "encryptionPassword",
+    ipBlocker: ipBlocker,
+    countryBlocker: countryBlocker);
 
-  app.setRateLimiter(RateLimiter(
-      storagePath: "./ratelimits",
-      maxRequests: 99,
-      resetDuration: Duration(hours: 1),
-      encryptionPassword: "encryptionPassword"));
+void main() async {
+  app.setRateLimiter(rateLimiter);
 
   // app.use(app.apiKeyMiddleware(apiKeyManager));           // Not needed for this example, will make ALL routes need an API key
   app.setupApiKeyRoutes(app, apiKeyManager);
+
+  enableDashboard(app);
 
   // custom 500 error
   app.set500((request, error) {
@@ -25,24 +41,37 @@ void main() async {
       ..close();
   });
 
-  app.route('GET', '/data', (HttpRequest request) async {
+  app.openApi();
+
+  app.route('GET', '/data', (req, res) async {
     final cacheKey = 'data_key';
     final cachedData = app.getCachedResponse(cacheKey);
 
     if (cachedData != null) {
-      await app.sendJson(request, cachedData); // Send cached response
+      await res.json(cachedData); // Send cached response
     } else {
       // Simulate fetching data
       final data = {'key': 'value'};
       app.cacheResponse(cacheKey, data); // Cache the response
-      await app.sendJson(request, data); // Send fresh response
+      await res.json(data); // Send fresh response
+    }
+  }, metadata: {
+    'summary': 'A route',
+    'operationId': 'getMain',
+    'responses': {
+      '200': {
+        'description': 'Successful Response',
+        'content': {
+          'application/json': {'type': 'string'}
+        }
+      }
     }
   });
   // Event test
-  app.route('GET', '/d', (HttpRequest request) async {
-    app.emit('dataRequested', {'path': request.uri.path}); // Emit event
+  app.route('GET', '/d', (req, res) async {
+    app.emit('dataRequested', {'path': req.uri.path}); // Emit event
     final data = {'key': 'value'};
-    await app.sendJson(request, data);
+    await res.json(data);
   });
 
   // on Shutdown the server
@@ -65,19 +94,19 @@ void main() async {
   });
 
   // Gets config
-  app.route('GET', '/config', (HttpRequest request) async {
+  app.route('GET', '/config', (req, res) async {
     final someSetting = app.getFromConfig('hi');
-    await app.sendJson(request, {'hi': someSetting});
+    await res.json({'hi': someSetting});
   });
 
   // serving static files
-  app.route('GET', '/static/<file>', (request) async {
-    var filePath = request.uri.pathSegments[2];
-    await app.serveStaticFile(request, 'static/$filePath');
+  app.route('GET', '/static/<file>', (req, res) async {
+    var filePath = req.uri.pathSegments[2];
+    await app.serveStaticFile(req, 'static/$filePath');
   });
 
   // render template
-  app.route('GET', '/hello', (HttpRequest request) async {
+  app.route('GET', '/hello', (req, res) async {
     final context = {
       'name': 'Alex',
       'version': dartcore.version,
@@ -87,25 +116,54 @@ void main() async {
       'showItems': true,
       'items': ['Item 1', 'Item 2', 'Item 3']
     };
-    await app.renderTemplate(request, './templates/child.html',
+    await app.renderTemplate(req, './templates/child.html',
         context); // renders child.html that extends hello.html
   });
 
   // JSON POST requests
-  app.route('POST', '/json', (request) async {
-    var jsonData = await app.parseJson(request);
-    await app.sendJson(request, {'received': jsonData});
+  app.route('POST', '/json', (req, res) async {
+    var jsonData = await app.parseJson(req);
+    await res.json({'received': jsonData});
   });
 
   // file uploads      -- Make the directory "uploads" before executing, else the server will crash with an OS error.
-  app.route('POST', '/upload', (request) async {
-    await app.parseMultipartRequest(request, 'uploads');
-    request.response
-      ..statusCode = HttpStatus.ok
-      ..write('File uploaded successfully.\n')
-      ..close();
+  app.route('POST', '/upload', (req, res) async {
+    await app.parseMultipartRequest(req, 'uploads');
+    await res.send("File Uploaded Successfully!", ContentType.text);
   });
+
+  app.register(MyAppisCool);
 
   // Start the server
   await app.start(port: 8080);
+}
+
+class MyAppisCool {
+  @Route("GET", "/")
+  // MUST BE `static`!
+  static void index(HttpRequest req, Response res) {
+    res.html("Hello World!");
+  }
+
+  @Route("GET", "/shutdown")
+  static void shutdownServer(HttpRequest req, Response res) {
+    res.html(
+        "<center><h1>Server is shutting down in 3 seconds...</h1></center>");
+    Future.delayed(Duration(seconds: 3), () {
+      app.shutdown();
+    });
+  }
+
+  @Route("POST", "/test")
+  static void testing(HttpRequest req, Response res) async {
+    res.json({"request": await app.parseJson(req)});
+  }
+
+  @Route("GET", "/block")
+  static void blockTest(HttpRequest req, Response res) async {
+    countryBlocker.block(
+        "CN"); // Blocks "China" country. sorry chinese people. thats just for showcasing
+    await rateLimiter.refresh();
+    res.json({"message": "Blocked China."});
+  }
 }
