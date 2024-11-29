@@ -1,10 +1,8 @@
 import 'dart:io';
 import 'package:dartcore/apikeymanager.dart';
 import 'package:dartcore/blocker.dart';
-import 'package:dartcore/custom_types.dart';
 import 'package:dartcore/dartcore.dart' as dartcore;
 
-import 'package:dartcore/annotation.dart';
 import 'package:dartcore/debug.dart';
 import 'package:dartcore/rate_limiter.dart';
 
@@ -29,7 +27,7 @@ void main() async {
   app.setRateLimiter(rateLimiter);
 
   // app.use(app.apiKeyMiddleware(apiKeyManager));           // Not needed for this example, will make ALL routes need an API key
-  app.setupApiKeyRoutes(app, apiKeyManager);
+  app.setupApiKeyRoutes(apiKeyManager);
 
   enableDashboard(app);
 
@@ -127,43 +125,28 @@ void main() async {
   });
 
   // file uploads      -- Make the directory "uploads" before executing, else the server will crash with an OS error.
-  app.route('POST', '/upload', (req, res) async {
+  app.post('/upload', (req, res) async {
     await app.parseMultipartRequest(req, 'uploads');
     await res.send("File Uploaded Successfully!", ContentType.text);
   });
 
-  app.register(MyAppisCool);
-
-  // Start the server
-  await app.start(port: 8080);
-}
-
-class MyAppisCool {
-  @Route("GET", "/")
-  // MUST BE `static`!
-  static void index(HttpRequest req, Response res) {
-    res.html("Hello World!");
-  }
-
-  @Route("GET", "/shutdown")
-  static void shutdownServer(HttpRequest req, Response res) {
+  app.get("/", (req, res) => res.html("<h1>Hello World!</h1>"));
+  app.get("/block", (req, res) async {
+    countryBlocker.block(
+        "CN"); // Blocks "China" country. sorry chinese people. thats just for showcasing
+    await rateLimiter.refresh();
+    res.json({"message": "Blocked China."});
+  });
+  app.get("/test",
+      (req, res) async => res.json({"request": await app.parseJson(req)}));
+  app.get("/shutdown", (req, res) async {
     res.html(
         "<center><h1>Server is shutting down in 3 seconds...</h1></center>");
     Future.delayed(Duration(seconds: 3), () {
       app.shutdown();
     });
-  }
+  });
 
-  @Route("POST", "/test")
-  static void testing(HttpRequest req, Response res) async {
-    res.json({"request": await app.parseJson(req)});
-  }
-
-  @Route("GET", "/block")
-  static void blockTest(HttpRequest req, Response res) async {
-    countryBlocker.block(
-        "CN"); // Blocks "China" country. sorry chinese people. thats just for showcasing
-    await rateLimiter.refresh();
-    res.json({"message": "Blocked China."});
-  }
+  // Start the server
+  await app.start(port: 8080);
 }
