@@ -1,7 +1,7 @@
-FROM dart:stable
+FROM dart:stable AS build
 WORKDIR /app
-COPY pubspec.* ./
-RUN dart pub get
 COPY . .
+RUN dart pub get
+RUN dart compile exe bin/main.dart -o bin/server
 EXPOSE 8080
-CMD ["dart", "run", "bin/main.dart"]
+CMD ["./bin/server"]

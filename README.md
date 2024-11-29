@@ -1,5 +1,5 @@
-# DartCore
-**DartCore** is a minimalist, yet powerful HTTP server framework for the Dart programming language. It provides a simple API for routing and handling HTTP requests, making it perfect for lightweight (not very, can be used for complex ones that will never crash) web applications, APIs, or microservices.
+# Dartcore
+**Dartcore** is a minimalist, yet powerful HTTP server framework for the Dart programming language. It provides a simple API for routing and handling HTTP requests, making it perfect for lightweight (not very, can be used for complex ones that will never crash) web applications, APIs, or microservices.
 
 ## Features
 - Simple and intuitive routing
@@ -7,10 +7,13 @@
 - Minimal dependencies
 - Easy to use for building RESTful APIs
 - Customizable request handling
+- Looks a bit like Flask :)
 
 ## Getting Started
 
 ### Installation
+
+#### Library:
 First, ensure you have the Dart SDK installed. Then, add `dartcore` to your `pubspec.yaml` file as a dependency.
 
 ```yaml
@@ -20,103 +23,56 @@ dependencies:
 
 Run `dart pub get` to install dependencies.
 
+#### CLI:
+You can install it by running the command:
+
+```bash
+dart pub activate global dartcore
+```
+
+and then try,
+
+```bash
+dartcore --version
+```
+
 ### Example Usage
 
-Follow these simple steps to set up your DartCore server.
+Follow these simple steps to set up your Dartcore server.
 
-### 1. Create a New Instance of DartCore
+### 1. Create a New Instance of Dartcore
 ```dart
 import 'package:dartcore/dartcore.dart' as dartcore;
-final app = dartcore.App();
+// "" is the config file path
+final app = dartcore.App(debug: true); // replace true with false in production mode! this specifies Debugging mode
 ```
 
 ### 2. Add Routes
 Use the `route` method to handle incoming HTTP requests. Specify the HTTP method (e.g., `GET`, `POST`, etc.) and the route.
 
 ```dart
-app.route('GET', '/', (HttpRequest req) {
-  req.response
-    ..write('Hello, Dart!')
-    ..close();
+app.route('GET', '/', (req, res) {
+  res.send("Hello from Dartcore!", ContentType.text);
 });
 
-app.route('GET', '/hello', (HttpRequest req) {
-  req.response
-    ..write('Hello World from /hello route!')
-    ..close();
+app.route('GET', '/hello', (req, res) {
+  res.json({"from":"Dartcore","message":"Hello World!"});
 });
 ```
 
 ### 3. Start the Server
-Use the `start` method to start the server. You can specify the `port` and `address`, or use the default values (`localhost` and `8080`).
+Use the `start` method to start the server.
 
 ```dart
 app.start(port: 8080);
 ```
 
 #### Optional Parameters:
-- **`address`**: The server's IP address (default: `0.0.0.0` --> All IP Addresses).
-- **`port`**: The port on which the server listens (default: `8080`).
+- (String) **`address`**: The server's IP address (default: `0.0.0.0` --> All IP Addresses).
+- (int) **`port`**: The port on which the server listens (default: `8080`).
 
 ### Full Example
-
-Here’s a complete example to get you started:
-
-```dart
-import 'dart:io';
-import 'package:dartcore/dartcore.dart' as dartcore;
-
-void main() async {
-  var app = dartcore.App();
-
-  // custom 404 error
-  app.set404((request) {
-    request.response
-      ..statusCode = HttpStatus.notFound
-      ..write('Custom 404 Not Found Handler\n')
-      ..close();
-  });
-
-  // custom 500 error
-  app.set500((request, error) {
-    request.response
-      ..statusCode = HttpStatus.internalServerError
-      ..write('Custom 500 Internal Server Error: $error\n')
-      ..close();
-  });
-
-  // middleware for logging
-  app.use((request, next) async {
-    print('[Middleware] ${request.method} ${request.uri}');
-    await next();
-  });
-
-  // serving static files
-  app.route('GET', '/static/<file>', (request) async {
-    var filePath = request.uri.pathSegments[2];
-    await app.serveStaticFile(request, 'static/$filePath');
-  });
-
-  // JSON POST requests
-  app.route('POST', '/json', (request) async {
-    var jsonData = await app.parseJson(request);
-    await app.sendJson(request, {'received': jsonData});
-  });
-
-  // file uploads      -- Make the directory "uploads" before executing, else the server will crash with an OS error.
-  app.route('POST', '/upload', (request) async {
-    await app.parseMultipartRequest(request, 'uploads');
-    request.response
-      ..statusCode = HttpStatus.ok
-      ..write('File uploaded successfully.\n')
-      ..close();
-  });
-
-  // Start the server
-  await app.start(port: 8080);
-}
-
-```
+See the full example on [pub.dev](https://pub.dev/packages/dartcore/example)!
 
 ### Running the Server
 Run your Dart server with:
@@ -125,7 +81,7 @@ Run your Dart server with:
 dart run
 ```
 
-Visit `http://127.0.0.1:8080/`, `http://localhost:8080/`, `http://YOUR_PUBLIC_IP:8080/` or `http://YOUR_PRIVATE_IP:8080/` to see the server in action!
+Visit `http://127.0.0.1:8080/`, `http://localhost:8080/`, or `http://YOUR_PRIVATE_IP:8080/` to see the server in action!
 
 ---
 
@@ -136,3 +92,21 @@ Contributions are welcome! Please feel free to submit issues and pull requests t
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Git repo Structure
+REPO
+|
+│   Dockerfile    == Example Dockerfile
+│   LICENSE      == MIT License
+│   pubspec.yaml   == Packages
+│   README.md   == This
+│
+├───example   == Example project
+│   │   config.json
+│   │   main.dart
+│   │
+│   └───templates
+│           child.html
+│           hello.html
+│
+└───lib   == Library, used in apps

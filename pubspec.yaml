@@ -1,15 +1,24 @@
 name: dartcore
 description: A simple, powerful Flask alternative for Dart, offering fast and efficient API development with scalability.
-version: 0.0.5
+version: 0.0.7
 repository: https://github.com/neoapps-dev/dartcore
 
 environment:
   sdk: ^3.5.3
 dependencies:
   aes256: ^1.0.4
+  crypto: ^3.0.6
+  dio: ^5.7.0
+  encrypt: ^5.0.3
+  http: ^1.2.2
   http_parser: ^4.1.0
   mime: ^2.0.0
+  mysql_client: ^0.0.27
+  postgres: ^3.4.4
+  toml: ^0.16.0
   uuid: ^4.5.1
+  xml: ^6.5.0
+  yaml: ^3.1.2
   # path: ^1.8.0
 
 dev_dependencies:

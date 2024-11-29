@@ -2,3 +2,8 @@
 # Created by `dart pub`
 .dart_tool/
 ratelimits
+example/ratelimits
+pubspec.lock
+example/ratelimits.ip
+example/ratelimits.country
+example/main.exe

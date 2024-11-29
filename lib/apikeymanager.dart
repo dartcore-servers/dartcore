@@ -6,7 +6,7 @@ class ApiKeyManager {
   final Set<ApiKey> _apiKeys = {};
   final Uuid _uuid = Uuid();
 
-  /// generates an API key
+  /// Generates an API key using a UUID v4
   ApiKey generateApiKey({DateTime? expiresAt}) {
     final key = _uuid.v4();
     final apiKey =
