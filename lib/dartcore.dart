@@ -7,11 +7,13 @@ import 'package:dartcore/apikeymanager.dart';
 import 'package:dartcore/blocker.dart';
 import 'package:dartcore/cache.dart';
 import 'package:dartcore/config.dart';
+import 'package:dartcore/custom_templates.dart';
 import 'package:dartcore/custom_types.dart';
 import 'package:dartcore/event_emitter.dart';
 import 'package:dartcore/openapi_spec.dart';
 import 'package:dartcore/rate_limiter.dart';
 import 'package:dartcore/template_engine.dart';
+import 'package:dartcore/websocket_support/handler.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
@@ -37,6 +39,7 @@ class App {
   final List<Middleware> _middlewares = [];
   Function(HttpRequest request)? _custom404;
   Function(HttpRequest request, Object error)? _custom500;
+  final _websocketRoutes = <String, void Function(WebSocket socket)>{};
 
   /// Debug mode (TODO)
   final bool debug = true;
@@ -118,6 +121,17 @@ class App {
     if (metadata != null) {
       _metadata.putIfAbsent(path, () => {})[method] = metadata;
     }
+  }
+
+  /// Adds a WebSocket route to the application with the specified path.
+  /// Associates the route with a handler function to manage WebSocket connections.
+  ///
+  /// - Parameters:
+  ///   - path: The path for the WebSocket route (e.g., '/ws/resource').
+  ///   - handler: The function to handle WebSocket connections for this route.
+
+  void ws(String path, void Function(WebSocket socket) handler) {
+    _websocketRoutes[path] = handler;
   }
 
   /// Adds a GET route to the application with the specified path.
@@ -349,6 +363,19 @@ class App {
   Future<void> _handleRequest(HttpRequest request, Response response) async {
     final path = request.uri.path;
     final method = request.method;
+
+    if (_websocketRoutes.containsKey(request.uri.path) &&
+        request.isWebSocketUpgrade) {
+      try {
+        var socket = await WebSocketTransformer.upgrade(request);
+        _websocketRoutes[request.uri.path]!(socket);
+      } catch (e) {
+        print('[dartcore] Failed to upgrade to WebSocket: $e');
+        request.response.statusCode = HttpStatus.internalServerError;
+        await request.response.close();
+      }
+      return;
+    }
 
     _applyCorsHeaders(request);
 
@@ -607,6 +634,33 @@ class App {
           await _templateEngine!.render(templatePath, context);
       request.response
         ..headers.contentType = ContentType.html
+        ..write(renderedTemplate)
+        ..close();
+    } catch (e) {
+      _handle500(request, e);
+    }
+  }
+
+  /// Renders a template file with the given context using a Custom Template Engine.
+  ///
+  /// The template file should have placeholders in the form
+  /// of `{{ key }}` where `key` is a key in the [context] map.
+  ///
+  /// The rendered template is written to the response and the response is
+  /// closed.
+  ///
+  /// If the template file does not exist or cannot be rendered, a 500 error
+  /// is sent to the client and the request is not closed.
+  ///
+  /// - [request]: The HTTP request.
+  /// - [template]: The template itself.
+  /// - [context]: The map containing the context for the template.
+  Future<void> render(HttpRequest request, CustomTemplateEngine ctemplateEngine,
+      String template, Map<String, dynamic> context) async {
+    try {
+      String renderedTemplate = ctemplateEngine.render(template, context);
+      request.response
+        ..headers.contentType = ctemplateEngine.contentType()
         ..write(renderedTemplate)
         ..close();
     } catch (e) {
