@@ -110,17 +110,31 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 REPO
 
 |
+
 │   Dockerfile    == Example Dockerfile
+
 │   LICENSE      == MIT License
+
 │   pubspec.yaml   == Packages
+
 │   README.md   == This
+
 │
+
 ├───example   == Example project
+
 │   │   config.json
+
 │   │   main.dart
+
 │   │
+
 │   └───templates
+
 │           child.html
+
 │           hello.html
+
 │
+
 └───lib   == Library, used in apps
