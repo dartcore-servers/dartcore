@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:dartcore/apikeymanager.dart';
 import 'package:dartcore/blocker.dart';
+import 'package:dartcore/custom_template_engines/json.dart';
 import 'package:dartcore/dartcore.dart' as dartcore;
 import 'package:dartcore/rate_limiter.dart';
 
@@ -36,6 +37,17 @@ void main() async {
   });
 
   app.openApi();
+
+  // WebSocket support!
+  app.ws('/ws', (socket) {
+    print('[App] WebSocket connection established');
+    socket.listen((message) {
+      print('Received: $message');
+      socket.add('[App] $message');
+    }, onDone: () {
+      print('[App] WebSocket connection closed');
+    });
+  });
 
   app.route('GET', '/data', (req, res) async {
     final cacheKey = 'data_key';
@@ -112,6 +124,17 @@ void main() async {
     };
     await app.renderTemplate(req, './templates/child.html',
         context); // renders child.html that extends hello.html
+  });
+
+  app.get("/hello/v2", (req, res) async {
+    await app.render(
+        req,
+        JsonTemplateEngine(),
+        '{"hello": "world", "name": "{{ name }}", "version": "{{ version }}}"',
+        {
+          'name': 'Alex',
+          'version': dartcore.version,
+        });
   });
 
   // JSON POST requests
