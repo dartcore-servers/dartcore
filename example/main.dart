@@ -2,8 +2,6 @@ import 'dart:io';
 import 'package:dartcore/apikeymanager.dart';
 import 'package:dartcore/blocker.dart';
 import 'package:dartcore/dartcore.dart' as dartcore;
-
-import 'package:dartcore/debug.dart';
 import 'package:dartcore/rate_limiter.dart';
 
 final app = dartcore.App(debug: true, metadata: {
@@ -28,8 +26,6 @@ void main() async {
 
   // app.use(app.apiKeyMiddleware(apiKeyManager));           // Not needed for this example, will make ALL routes need an API key
   app.setupApiKeyRoutes(apiKeyManager);
-
-  enableDashboard(app);
 
   // custom 500 error
   app.set500((request, error) {

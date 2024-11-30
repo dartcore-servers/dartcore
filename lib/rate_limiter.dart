@@ -75,7 +75,10 @@ class RateLimiter {
     }
   }
 
-  /// Refreshes the rate limits, IP and Country block lists
+  /// Refreshes the rate limiter by saving the current request data to storage.
+  ///
+  /// This method ensures that the request data is persisted,
+  /// allowing the rate limiter to maintain its state across restarts.
   Future<void> refresh() async {
     await _saveRequests();
   }
@@ -106,7 +109,20 @@ class RateLimiter {
     await File("$storagePath.country").writeAsString(countryBlocker.asJson());
   }
 
-  /// Check if IP is rate limited
+  /// Checks if the client IP address is rate-limited.
+  ///
+  /// This function first checks if the given [clientIp] is in the blocked
+  /// list using the IP blocker. If the IP is blocked, it returns `true`.
+  /// Otherwise, it checks the number of requests associated with the [clientIp].
+  /// If the number of requests exceeds the [maxRequests] within the
+  /// [resetDuration], the function returns `true`, indicating that the IP is
+  /// rate-limited. Otherwise, it records the current request and returns `false`.
+  ///
+  /// - Parameters:
+  ///   - clientIp: The IP address of the client to check for rate limiting.
+  ///
+  /// - Returns: A `Future` that resolves to `true` if the IP is rate-limited,
+  ///   or `false` if the IP is not rate-limited.
   Future<bool> isRateLimited(String clientIp) async {
     // First, it gonna check if the IP is blocked
     if (ipBlocker.isIpBlocked(clientIp)) {

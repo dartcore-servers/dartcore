@@ -68,10 +68,20 @@ class Database {
     await conn!.connect();
   }
 
-  /// Executes a query
-  /// Returns an IResultSet in case of MySQL
-  /// and Returns Result in case of PostgreSQL
-  /// [iterable] is only usable for MySQL
+  /// Executes a SQL query on the connected database.
+  ///
+  /// This method supports both MySQL and PostgreSQL databases. For MySQL, the
+  /// [iterable] parameter can be set to true to return an iterable result set.
+  ///
+  /// - Parameters:
+  ///   - query: The SQL query to be executed.
+  ///   - args: Optional map of query parameters to be used in the query.
+  ///   - iterable: Optional boolean indicating whether the result set should be
+  ///     iterable (only applicable for MySQL).
+  ///
+  /// - Returns: A future that resolves to the result of the query. The type of
+  ///   the result depends on the database being used: IResultSet for MySQL and
+  ///   Result for PostgreSQL.
   Future<dynamic> exec(
     String query, [
     Map<String, dynamic>? args,
@@ -84,7 +94,7 @@ class Database {
     }
   }
 
-  /// Closes the connection
+  /// Closes the database connection
   Future<void> close() async {
     await conn!.close();
   }

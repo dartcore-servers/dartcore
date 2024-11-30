@@ -6,6 +6,12 @@ import 'package:crypto/crypto.dart';
 /// A class for encrypting and decrypting JSON data using AES
 class Encryptor {
   /// Encrypts JSON data using AES and returns the encrypted bytes
+  ///
+  /// - Parameters:
+  ///   - jsonData: The JSON data to be encrypted.
+  ///   - password: The password to use for encryption.
+  ///
+  /// - Returns: The encrypted bytes of the JSON data.
   Future<Uint8List> ejson(Uint8List jsonData, String password) async {
     final key = _generateKey(password);
     final iv = encrypt.IV.fromLength(16);
@@ -23,7 +29,17 @@ class Encryptor {
     return result;
   }
 
-  /// Decrypts JSON data using AES and returns the decrypted bytes
+  /// Decrypts encrypted JSON data using AES and returns the decrypted bytes.
+  ///
+  /// The initialization vector (IV) is extracted from the first 16 bytes of
+  /// the [encryptedData]. The remaining bytes are considered the encrypted content.
+  ///
+  /// - Parameters:
+  ///   - encryptedData: The data to be decrypted, which includes the IV.
+  ///   - password: The password used for decryption, which should match the
+  ///     password used during encryption.
+  ///
+  /// - Returns: The decrypted bytes of the JSON data.
   Future<Uint8List> djson(Uint8List encryptedData, String password) async {
     final key = _generateKey(password);
     final iv = encrypt.IV(Uint8List.fromList(encryptedData.sublist(0, 16)));

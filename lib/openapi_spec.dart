@@ -2,8 +2,16 @@
 
 import 'package:dartcore/dartcore.dart';
 
-/// Generates an OpenAPI Spec from every route in [app]
-/// only set [usingThat] to `true` if the invoker is `app.openApi()`
+/// Generates an OpenAPI specification for the given [app].
+///
+/// The resulting specification is a JSON object conforming to the OpenAPI 3.0
+/// specification. It includes information about the routes, methods, and
+/// responses of the application.
+///
+/// The [usingThat] parameter is a hack to make it easier for the user to
+/// document their API. It is used to remove the SwaggerUI routes from the
+/// generated specification. Set it to `true` if the invoker is
+/// `app.openApi()`.
 Map<String, dynamic> generateOpenApiSpec(App app, bool usingThat) {
   var paths = <String, Map<String, dynamic>>{};
   var routes = app.routes();

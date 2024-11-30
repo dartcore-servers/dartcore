@@ -17,7 +17,7 @@ import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
 
 /// dartcore's version
-const version = '0.0.7';
+const version = '0.0.8-git';
 
 /// Defines Handler
 typedef Handler = Future<void> Function(HttpRequest request, Response response);
@@ -61,24 +61,45 @@ class App {
     );
   }
 
-  /// Sets a custom rate limiter
+  /// Sets the rate limiter for the application.
+  ///
+  /// - Parameters:
+  ///   - ratelimiter: The RateLimiter instance to be used for managing
+  ///     the rate limits of incoming requests.
   void setRateLimiter(RateLimiter ratelimiter) {
     _rateLimiter = ratelimiter;
   }
 
-  /// Returns dartcore's version
+  /// Returns the current version of dartcore as a string.
   String getVersion() {
     return version;
   }
 
-  /// Returns the routes
-  /// e.g. final routes = app.routes();
+  /// Returns a map of all the routes in the application, where each key is
+  /// an HTTP method and the value is another map with the path as the key
+  /// and the handler function as the value.
+  ///
+  /// For example, if the application has a route for GET requests to '/api',
+  /// the returned map would contain the following entry:
+  ///
+  /// {
+  ///   'GET': {
+  ///     '/api': (HttpRequest request, Response response) {
+  ///       // Handle the request
+  ///     }
+  ///   }
+  /// }
   Map<String, Map<String, Handler>> routes() {
     return _routes;
   }
 
-  /// Returns all the metadata
-  /// e.g. final metadata = app.metadata();
+  /// Returns the metadata associated with the application.
+  ///
+  /// The metadata contains key-value pairs that provide additional
+  /// information about the application, such as title, version,
+  /// and description.
+  ///
+  /// - Returns: A map containing the application's metadata.
   Map<String, dynamic> metadata() {
     return _metadata;
   }
@@ -159,7 +180,16 @@ class App {
     }
   }
 
-  /// Converts an IP to a Location
+  /// Returns the country for the given IP address.
+  ///
+  /// This method sends a request to http://ip-api.com/json/$ip to get the country
+  /// for the given IP address. If the request is successful, it returns the country,
+  /// otherwise it returns null.
+  ///
+  /// - Parameters:
+  ///   - ip: The IP address to get the country for.
+  ///
+  /// - Returns: The country for the given IP address, or null if the request fails.
   Future<String?> getGeoLocation(String ip) async {
     final url = 'http://ip-api.com/json/$ip';
     final response = await http.get(Uri.parse(url));
@@ -171,7 +201,17 @@ class App {
     return null;
   }
 
-  /// Checks if a country is blocked
+  /// Determines if the country associated with the given IP address is blocked.
+  ///
+  /// This function retrieves the country associated with the provided [ip] address
+  /// using the `getGeoLocation` method. It then checks if the country is present
+  /// in the list of blocked countries managed by the rate limiter's country blocker.
+  ///
+  /// - Parameters:
+  ///   - ip: The IP address for which to check the country block status.
+  ///
+  /// - Returns: A `Future` that resolves to `true` if the country is blocked,
+  ///   or `false` if the country is not blocked or if the country could not be determined.
   Future<bool> isBlockedCountry(String ip) async {
     final country = await getGeoLocation(ip);
     final blockedCountries = _rateLimiter!.countryBlocker.blockedList;
@@ -237,12 +277,32 @@ class App {
     }
   }
 
-  /// Get configuration
+  /// Retrieves a configuration value by its key.
+  ///
+  /// - Parameters:
+  ///   - key: The key of the configuration value to retrieve.
+  ///
+  /// - Returns: The value associated with the key, or null if the key does not exist.
   dynamic getFromConfig(String key) {
     return _config?.get(key);
   }
 
-  /// Makes SwaggerUI routes (can be copy-pasted and edited but just add `app.` before each `route()`)
+  /// Adds SwaggerUI routes to the application.
+  ///
+  /// This method makes it easier for users to document and use the API.
+  /// It sets up routes for the SwaggerUI at the following paths:
+  /// - `/openapi`: The OpenAPI specification for the API.
+  /// - `/docs`: The SwaggerUI itself.
+  /// - `/index.css`: The CSS file for the SwaggerUI.
+  /// - `/swagger-ui-bundle.js`: The JavaScript file for the SwaggerUI.
+  /// - `/swagger-initializer.js`: A JavaScript file that initializes the SwaggerUI.
+  /// - `/swagger-ui-standalone-preset.js`: A JavaScript file that sets up the SwaggerUI with the standalone preset.
+  ///
+  /// The user can visit the SwaggerUI at `<http://localhost:8080/docs>`.
+  ///
+  /// You can also copy-paste and edit the names of the routes, but you should
+  /// add `app.` before each `route()` call to ensure that the routes are correctly
+  /// added to the application.
   void openApi() {
     route("GET", "/openapi", (req, res) async {
       res.json(generateOpenApiSpec(this,
@@ -370,7 +430,13 @@ class App {
     }
   }
 
-  /// Verifies the CAPTCHA response
+  /// Verifies the given CAPTCHA [response] with the provided [secretKey].
+  ///
+  /// - Parameters:
+  ///   - response: The user's response to the CAPTCHA challenge.
+  ///   - secretKey: The secret key of the recaptcha site.
+  ///
+  /// - Returns: `true` if the CAPTCHA is valid, `false` otherwise.
   Future<bool> verifyCaptcha(String response, String secretKey) async {
     final url = Uri.parse('https://www.google.com/recaptcha/api/siteverify');
     final responseH = await http.post(
@@ -417,12 +483,19 @@ class App {
     print('[dartcore] ${request.method} ${request.uri.path} --> 404');
   }
 
-  /// Sets a custom 404 Message
+  /// Sets a custom 404 error handler.
+  /// The handler is called with the original [HttpRequest] as an argument.
+  /// The handler is responsible for writing a response to the client
+  /// and closing the request.
   void set404(Function(HttpRequest request) handler) {
     _custom404 = handler;
   }
 
-  /// Sets a custom 500 Message
+  /// Sets a custom 500 error handler.
+  /// The handler is called with the original [HttpRequest] and the error
+  /// object as arguments.
+  /// The handler is responsible for writing a response to the client
+  /// and closing the request.
   void set500(Function(HttpRequest request, Object error) handler) {
     _custom500 = handler;
   }
@@ -513,7 +586,20 @@ class App {
     }
   }
 
-  /// Renders a template and sends it as a response
+  /// Renders a template file with the given context.
+  ///
+  /// The template file should be an HTML file with placeholders in the form
+  /// of `{{ key }}` where `key` is a key in the [context] map.
+  ///
+  /// The rendered template is written to the response and the response is
+  /// closed.
+  ///
+  /// If the template file does not exist or cannot be rendered, a 500 error
+  /// is sent to the client and the request is not closed.
+  ///
+  /// - [request]: The HTTP request.
+  /// - [templatePath]: The path to the template file.
+  /// - [context]: The map containing the context for the template.
   Future<void> renderTemplate(HttpRequest request, String templatePath,
       Map<String, dynamic> context) async {
     try {
@@ -528,7 +614,17 @@ class App {
     }
   }
 
-  /// Middleware to handle errors
+  /// Middleware that catches any unhandled errors in the stack and handles
+  /// them according to the error handling strategy of the app.
+  ///
+  /// The error handling strategy is as follows:
+  ///
+  /// 1. If an error handler is specified, it is called with the error and
+  ///    stack trace. The handler should return a boolean indicating whether
+  ///    the error was handled. If the error was handled, the request is
+  ///    closed. If the error was not handled, the request is not closed.
+  /// 2. If no error handler is specified, a 500 error is sent to the client
+  ///    and the request is not closed.
   Middleware errorHandlingMiddleware() {
     return (HttpRequest request, Function next) async {
       try {
@@ -539,7 +635,6 @@ class App {
     };
   }
 
-  /// Handle errors and respond to the client
   void _handleError(HttpRequest request, Object error, StackTrace stackTrace) {
     print('[dartcore] Error: $error\nStackTrace: $stackTrace');
     request.response
@@ -548,27 +643,48 @@ class App {
       ..close();
   }
 
-  /// Caches a response
+  /// Stores a response in the cache under the given key.
+  ///
+  /// - Parameters:
+  ///   - key: The key to store the response under.
+  ///   - value: The response to store in the cache.
   void cacheResponse(String key, dynamic value) {
     _cache.set(key, value);
   }
 
-  /// Retrieves a cached response
+  /// Retrieves a response from the cache under the given key.
+  ///
+  /// - Parameters:
+  ///   - key: The key of the response to retrieve.
+  ///
+  /// - Returns: The response associated with the key, or null if the key is not in the cache.
   dynamic getCachedResponse(String key) {
     return _cache.get(key);
   }
 
-  /// Adds an event listener
+  /// Adds a listener for a specific event.
+  ///
+  /// - Parameters:
+  ///   - event: The name of the event to listen for.
+  ///   - listener: The function to call when the event is emitted.
   void on(String event, Function(dynamic) listener) {
     _eventEmitter.on(event, listener);
   }
 
-  /// Emits an event
+  /// Emits an event, calling all registered listeners.
+  ///
+  /// - Parameters:
+  ///   - event: The name of the event to emit.
+  ///   - data: The data to pass to the listeners.
   void emit(String event, [dynamic data]) {
     _eventEmitter.emit(event, data);
   }
 
-  /// Gracefully shuts down the server
+  /// Shuts down the server if it is running.
+  ///
+  /// If the server is running, it will be closed and a shutdown message will be printed.
+  /// An event named 'serverShutdown' will be emitted with a message indicating the server
+  /// has been shut down.
   Future<void> shutdown() async {
     if (_server != null) {
       await _server!.close();
@@ -577,7 +693,15 @@ class App {
     }
   }
 
-  /// API Key Middleware
+  /// Middleware that validates API keys using the provided [apiKeyManager].
+  ///
+  /// This middleware checks for the presence of an 'x-api-key' header in the
+  /// request. If the header is missing or the API key is invalid, a 403
+  /// Forbidden response is returned to the client. If the API key is valid,
+  /// the request is passed to the next middleware or handler in the chain.
+  ///
+  /// - Parameters:
+  ///   - apiKeyManager: The manager responsible for validating API keys.
   Middleware apiKeyMiddleware(ApiKeyManager apiKeyManager) {
     return (HttpRequest request, Function next) async {
       final apiKey = request.headers['x-api-key']?.first;

@@ -13,16 +13,21 @@ class Response {
     request.response.headers.set(key, value);
   }
 
-  /// Sends a json response
-  Future<void> json(Map<String, dynamic> data) async {
+  /// Sends a JSON response with the provided [data].
+  ///
+  /// The response's content type is set to `application/json`.
+  /// The [data] is encoded to a JSON string and written to the response.
+  Future<void> json(dynamic data) async {
     request.response
       ..headers.contentType = io.ContentType.json
       ..write(jsonEncode(data))
       ..close();
   }
 
-  /// Serves a file, useful for downloading a file
-
+  /// Sends the file at the given path to the client.
+  ///
+  /// If the file does not exist, a 404 error is sent to the client and
+  /// the request is not closed.
   Future<void> file(io.File file) async {
     if (await file.exists()) {
       request.response.headers.contentType = io.ContentType.binary;
@@ -32,8 +37,10 @@ class Response {
     }
   }
 
-  /// Sends an HTML data
-
+  /// Sends an HTML response with the provided [htmlContent].
+  ///
+  /// The response's content type is set to `text/html`.
+  /// The [htmlContent] is written to the response and the response is closed.
   Future<void> html(String htmlContent) async {
     request.response
       ..headers.contentType = io.ContentType.html
@@ -41,8 +48,11 @@ class Response {
       ..close();
   }
 
-  /// Sends a data with a custom type
-
+  /// Sends a response with the provided [content] and [contentType].
+  ///
+  /// The content type of the response is set to [contentType].
+  /// The content type of the response is set to [contentType].
+  /// The [content] is written to the response and the response is closed.
   Future<void> send(String content, io.ContentType contentType) async {
     request.response
       ..headers.contentType = contentType
@@ -50,8 +60,13 @@ class Response {
       ..close();
   }
 
-  /// Sends a static file
-
+  /// Sends the file at the given path to the client.
+  ///
+  /// The response's content type is set to [contentType].
+  /// The content of the file is read and written to the response and the response is closed.
+  ///
+  /// If the file does not exist, a 404 error is sent to the client and
+  /// the request is not closed.
   Future<void> staticFile(String path, io.ContentType contentType) async {
     request.response
       ..headers.contentType = contentType

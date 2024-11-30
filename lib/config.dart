@@ -33,7 +33,12 @@ class Config {
     }
   }
 
-  /// Get a config value
+  /// Retrieves a configuration value by its key.
+  ///
+  /// - Parameters:
+  ///   - key: The key of the configuration value to retrieve.
+  ///
+  /// - Returns: The value associated with the key, or `null` if the key does not exist.
   dynamic get(String key) {
     return _settings[key];
   }

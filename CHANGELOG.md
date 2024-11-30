@@ -53,3 +53,7 @@
 ## 0.0.7
 - Removed Annotation for Flutter and AOT support
 - Better documentation for some methods
+
+## 0.0.8
+- Improved documentation for ALL methods
+- Implemented Hot Reload (1. force hot reload, 2. auto-hot-reload by watching changes)
