@@ -104,37 +104,3 @@ Contributions are welcome! Please feel free to submit issues and pull requests t
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Git repo Structure
-
-REPO
-
-|
-
-│   Dockerfile    == Example Dockerfile
-
-│   LICENSE      == MIT License
-
-│   pubspec.yaml   == Packages
-
-│   README.md   == This
-
-│
-
-├───example   == Example project
-
-│   │   config.json
-
-│   │   main.dart
-
-│   │
-
-│   └───templates
-
-│           child.html
-
-│           hello.html
-
-│
-
-└───lib   == Library, used in apps
