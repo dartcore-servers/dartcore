@@ -30,12 +30,16 @@ void watchFiles(Function onFileChange) {
 /// detected.
 void hotReload(App app) async {
   await app.shutdown();
+  print("[dartcore] Hot reloading...");
+  print("[dartcore]");
   var result = await Process.start(
     Platform.executable,
     Platform.executableArguments + [Platform.script.toFilePath()],
     mode: ProcessStartMode.inheritStdio,
   );
-
+  print("[dartcore] Server started in the background");
+  print("[dartcore] Your shell will inherit the new stdout/stderr streams.");
+  print("[dartcore] with PID: ${result.pid}");
   exit(0);
 }
 
@@ -47,6 +51,7 @@ void hotReload(App app) async {
 ///
 /// The application is restarted by calling the [hotReload] function.
 void enableHotReload(App app) {
+  print("[dartcore] 🗹  Hot Reload");
   watchFiles(() => hotReload(app));
 }
 
@@ -58,6 +63,8 @@ void enableHotReload(App app) {
 ///
 /// This function is useful for temporarily disabling hot reloading
 /// without having to comment out the call to [enableHotReload].
+/// or dynamically disable hot reloading based on some condition.
 void disableHotReload(App app) {
+  print("[dartcore] [𐄂] Hot Reload");
   watchFiles(() => {});
 }

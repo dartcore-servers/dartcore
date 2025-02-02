@@ -63,3 +63,5 @@
 - Implemented Queue system
 - Implemented Custom Template Engines
 - Added some quite good built-in custom template engines for JSON, YAML, Toml, CSS and Javascript
+- Better CLI looking :)
+- (not well-tested, beta) HTTPS Support!!

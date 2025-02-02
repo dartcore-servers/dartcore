@@ -1,4 +1,4 @@
-// ignore_for_file: unnecessary_null_comparison
+// ignore_for_file: unnecessary_null_comparison, empty_catches
 
 import 'dart:async';
 import 'dart:convert';
@@ -12,6 +12,7 @@ import 'package:dartcore/custom_types.dart';
 import 'package:dartcore/event_emitter.dart';
 import 'package:dartcore/openapi_spec.dart';
 import 'package:dartcore/rate_limiter.dart';
+import 'package:dartcore/ssl.dart';
 import 'package:dartcore/template_engine.dart';
 import 'package:dartcore/websocket_support/handler.dart';
 import 'package:dio/dio.dart' as dio;
@@ -19,7 +20,7 @@ import 'package:http/http.dart' as http;
 import 'package:mime/mime.dart';
 
 /// dartcore's version
-const version = '0.0.8-git';
+const version = '0.0.8';
 
 /// Defines Handler
 typedef Handler = Future<void> Function(HttpRequest request, Response response);
@@ -44,10 +45,27 @@ class App {
   /// Debug mode (TODO)
   final bool debug = true;
 
+  /// Enable HTTPS-only mode
+  /// Requires you to change [sslOptions]
+  final bool useHttps = false;
+
+  /// SSL Options. for HTTPS
+  /// required if you set [useHttps] to true
+  final SSLOptions sslOptions =
+      SSLOptions(keyFile: "./private.key", certificate: "./certificate.crt");
+
+  /// ReCAPTCHA Site Key
+  final String siteKey = "";
   RateLimiter? _rateLimiter;
 
   /// Constructor
-  App({String? configPath, bool? debug, Map<String, dynamic>? metadata}) {
+  App(
+      {String? configPath,
+      bool? debug,
+      bool? useHttps,
+      SSLOptions? sslOptions,
+      Map<String, dynamic>? metadata,
+      String? siteKey}) {
     _config = Config(configPath ?? "");
     _metadata = metadata ??
         {"title": "My API", "version": "1.0.0", "description": "Dartcore API"};
@@ -58,7 +76,6 @@ class App {
       maxRequests: 60,
       resetDuration: Duration(minutes: 1),
       ipBlocker: IPBlocker(), // Yeah, recommend changing it
-      countryBlocker: CountryBlocker(), // Yeah...
       encryptionPassword:
           "dartcore", // Don't keep it unless it's a private server, recommend changing it
     );
@@ -215,24 +232,6 @@ class App {
     return null;
   }
 
-  /// Determines if the country associated with the given IP address is blocked.
-  ///
-  /// This function retrieves the country associated with the provided [ip] address
-  /// using the `getGeoLocation` method. It then checks if the country is present
-  /// in the list of blocked countries managed by the rate limiter's country blocker.
-  ///
-  /// - Parameters:
-  ///   - ip: The IP address for which to check the country block status.
-  ///
-  /// - Returns: A `Future` that resolves to `true` if the country is blocked,
-  ///   or `false` if the country is not blocked or if the country could not be determined.
-  Future<bool> isBlockedCountry(String ip) async {
-    final country = await getGeoLocation(ip);
-    final blockedCountries = _rateLimiter!.countryBlocker.blockedList;
-
-    return country != null && blockedCountries.contains(country);
-  }
-
   /// Adds a middleware to the list of middlewares that will be executed in order.
   /// Note that the order of execution is the same as the order of addition.
   /// You can add a middleware at any time, but it will only start executing on new requests.
@@ -257,24 +256,35 @@ class App {
   /// rate limit file if it exists, and exit with code 0.
   Future<void> start({String address = '0.0.0.0', int port = 8080}) async {
     try {
-      _server = await HttpServer.bind(address, port);
+      if (!useHttps) {
+        print("️🖥️ \x1B[94m️Running in HTTP mode...\x1B[0m");
+        _server = await HttpServer.bind(address, port);
+      } else {
+        SecurityContext securityContext = SecurityContext();
+        print("️🖥️ \x1B[94mRunning in HTTPS mode...\x1B[0m");
+        securityContext = SecurityContext(withTrustedRoots: true)
+          ..setTrustedCertificates(sslOptions.certificate);
+        securityContext.usePrivateKey(sslOptions.keyFile);
+        securityContext.setAlpnProtocols(['h2', 'http/1.1'], true);
+        _server = await HttpServer.bindSecure(address, port, securityContext);
+      }
     } on SocketException catch (e) {
       if (e.osError!.errorCode == 10048) {
         print(
-            '[dartcore] Port is already in use, try to use to a different port.');
+            ' ❌ \x1B[91mPort is already in use, try to use to a different port.\x1B[0m');
         exit(1);
       } else {
         print(
-            '[dartcore] Failed to start server: OS ERROR ${e.osError!.errorCode}, ${e.osError!.message}');
+            ' ❌ \x1B[91mFailed to start server: OS ERROR ${e.osError!.errorCode}, ${e.osError!.message}\x1B[0m');
         exit(1);
       }
     } catch (e) {
-      print('[dartcore] Failed to start server:');
+      print(' ❌ \x1B[91mFailed to start server:\x1B[0m');
       print(e);
       exit(1);
     }
     print(
-        '[dartcore] Server running on ${_server!.address.address}:${_server!.port}\n[dartcore] Press Ctrl+C to shutdown the Server.');
+        ' 🚀 \x1B[92mServer running on ${_server!.address.address}:${_server!.port}\x1B[0m\n 🛑 Press \x1B[91mCtrl+C\x1B[0m to shutdown the Server.');
     emit('serverStarted', {'address': address, 'port': port});
 
     ProcessSignal.sigint.watch().listen((_) async {
@@ -285,6 +295,13 @@ class App {
       await shutdown();
       exit(0);
     });
+
+    int columns = 48;
+    String border = '─' * (columns ~/ 2);
+
+    const String inverse = '\x1B[7m';
+    const String reset = '\x1B[0m';
+    stdout.writeln('$border$inverse LOGS $reset$border\n');
 
     await for (HttpRequest request in _server!) {
       await _handleRequest(request, Response(request: request));
@@ -370,7 +387,7 @@ class App {
         var socket = await WebSocketTransformer.upgrade(request);
         _websocketRoutes[request.uri.path]!(socket);
       } catch (e) {
-        print('[dartcore] Failed to upgrade to WebSocket: $e');
+        print(' ❌ \x1B[91mFailed to upgrade to WebSocket: $e\x1B[0m');
         request.response.statusCode = HttpStatus.internalServerError;
         await request.response.close();
       }
@@ -386,18 +403,12 @@ class App {
         _handleRateLimit(request);
         return;
       }
-      if (await isBlockedCountry(clientIp)) {
-        request.response.statusCode = HttpStatus.forbidden;
-        request.response.write(
-            'Access from your country is blocked.\n[dartcore v$version]');
-        await request.response.close();
-        return;
-      }
 
       final handler = _findHandler(method, path);
       if (handler != null) {
         await handler(request, response);
-        print('[dartcore] $method $path --> ${request.response.statusCode}');
+        print(
+            ' 🖥️ \x1B[94m $method $path \x1B[90m --> \x1B[94m ${request.response.statusCode}\x1B[0m');
       } else {
         _custom404?.call(request) ?? _handle404(request);
       }
@@ -440,20 +451,25 @@ class App {
         ..close();
     } else {
       final res = Response(request: request);
-      res.html("""
-<html>
-<title>Rate Limit Exceeded - Dartcore</title>
-    <body>
-      <p>You have exceeded the maximum number of requests. Please complete the CAPTCHA to continue:</p>
-      <div class="g-recaptcha" data-sitekey="YOUR_SITE_KEY"></div>
-      <script src="https://www.google.com/recaptcha/api.js" async defer></script>
-      <form action="/verify-captcha" method="post">
-        <input type="hidden" name="captchaResponse" value="CAPTCHA_RESPONSE">
-        <button type="submit">Submit</button>
-      </form>
-    </body>
-  </html>
-""");
+      res.json({
+        "success": false,
+        "message": "Rate limit exceeded",
+        "info": "Captcha is still in beta. and may not work."
+      });
+//       res.html("""
+// <html>
+// <title>Rate Limit Exceeded</title>
+//     <body>
+//       <p>You have exceeded the maximum number of requests. Please complete the CAPTCHA to continue:</p>
+//       <div class="g-recaptcha" data-sitekey="$siteKey"></div>
+//       <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+//       <form action="/verify-captcha" method="post">
+//         <input type="hidden" name="captchaResponse" value="CAPTCHA_RESPONSE">
+//         <button type="submit">Submit</button>
+//       </form>
+//     </body>
+//   </html>
+// """);
     }
   }
 
@@ -488,7 +504,7 @@ class App {
 
   bool _isMatchingRoute(String route, String path) {
     if (route == path) return true;
-    if (route.endsWith('/*')) {
+    if (route.endsWith('*')) {
       final baseRoute = route.substring(0, route.length - 2);
       return path.startsWith(baseRoute);
     }
@@ -743,6 +759,12 @@ class App {
     if (_server != null) {
       await _server!.close();
       print('[dartcore] Server shutting down.');
+      try {
+        File("./ratelimits").deleteSync();
+      } catch (e) {}
+      try {
+        File("./ratelimits.ip").deleteSync();
+      } catch (e) {}
       emit('serverShutdown', {'message': 'Server has been shut down.'});
     }
   }

@@ -13,9 +13,6 @@ class RateLimiter {
   /// IP Blocker instance
   final IPBlocker ipBlocker;
 
-  /// Country Blocker instance
-  final CountryBlocker countryBlocker;
-
   /// Specifies if the captcha should be displayed when the rate limit is exceeded
   final bool shouldDisplayCaptcha;
 
@@ -37,7 +34,6 @@ class RateLimiter {
     required this.resetDuration,
     required this.encryptionPassword,
     required this.ipBlocker,
-    required this.countryBlocker,
     required this.shouldDisplayCaptcha,
   }) {
     _loadRequests();
@@ -106,7 +102,6 @@ class RateLimiter {
     // Saves the IP block list
     await File("$storagePath.ip").writeAsBytes(await Encryptor()
         .ejson(utf8.encode(ipBlocker.asJson()), encryptionPassword));
-    await File("$storagePath.country").writeAsString(countryBlocker.asJson());
   }
 
   /// Checks if the client IP address is rate-limited.
@@ -124,18 +119,13 @@ class RateLimiter {
   /// - Returns: A `Future` that resolves to `true` if the IP is rate-limited,
   ///   or `false` if the IP is not rate-limited.
   Future<bool> isRateLimited(String clientIp) async {
-    // First, it gonna check if the IP is blocked
     if (ipBlocker.isIpBlocked(clientIp)) {
       return true;
     }
-
-    await File("$storagePath.country").writeAsString(countryBlocker.asJson());
-
     final now = DateTime.now();
     _requests[clientIp] ??= [];
     _requests[clientIp]!
         .removeWhere((time) => now.difference(time) > resetDuration);
-
     if (_requests[clientIp]!.length < maxRequests) {
       _requests[clientIp]!.add(now);
       _saveRequests();

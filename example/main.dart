@@ -3,24 +3,28 @@ import 'package:dartcore/apikeymanager.dart';
 import 'package:dartcore/blocker.dart';
 import 'package:dartcore/custom_template_engines/json.dart';
 import 'package:dartcore/dartcore.dart' as dartcore;
+import 'package:dartcore/hotreload.dart';
 import 'package:dartcore/rate_limiter.dart';
 
-final app = dartcore.App(debug: true, metadata: {
-  "version": "1.0.0",
-  "description": "Dartcore Example",
-  "title": "Example",
-}); // optional to inculde config, but might helps in removing repeated parts of the code
+final app = dartcore.App(
+    debug: true,
+    useHttps: false,
+    // sslOptions: SSLOptions(keyFile: "./private.key", certificate: "./certificate.crt"),
+    metadata: {
+      "version": "1.0.0",
+      "description": "Dartcore Example",
+      "title": "Example",
+    }); // optional to inculde config, but might helps in removing repeated parts of the code
 final apiKeyManager = ApiKeyManager();
 final IPBlocker ipBlocker = IPBlocker();
-final CountryBlocker countryBlocker = CountryBlocker();
 final RateLimiter rateLimiter = RateLimiter(
-    shouldDisplayCaptcha: true,
-    storagePath: "./ratelimits",
-    maxRequests: 99,
-    resetDuration: Duration(hours: 1),
-    encryptionPassword: "encryptionPassword",
-    ipBlocker: ipBlocker,
-    countryBlocker: countryBlocker);
+  shouldDisplayCaptcha: true,
+  storagePath: "./ratelimits",
+  maxRequests: 2,
+  resetDuration: Duration(hours: 1),
+  encryptionPassword: "encryptionPassword",
+  ipBlocker: ipBlocker,
+);
 
 void main() async {
   app.setRateLimiter(rateLimiter);
@@ -150,12 +154,6 @@ void main() async {
   });
 
   app.get("/", (req, res) => res.html("<h1>Hello World!</h1>"));
-  app.get("/block", (req, res) async {
-    countryBlocker.block(
-        "CN"); // Blocks "China" country. sorry chinese people. thats just for showcasing
-    await rateLimiter.refresh();
-    res.json({"message": "Blocked China."});
-  });
   app.get("/test",
       (req, res) async => res.json({"request": await app.parseJson(req)}));
   app.get("/shutdown", (req, res) async {
@@ -165,6 +163,9 @@ void main() async {
       app.shutdown();
     });
   });
+
+  // enable hotreload (beta, works only if the code is in the same directory)
+  enableHotReload(app);
 
   // Start the server
   await app.start(port: 8080);

@@ -29,7 +29,7 @@ class Config {
       }
     } else {
       print(
-          '[dartcore] Configuration file not found: ${filePath.replaceFirst("", "null")}');
+          ' ❌ \x1B[91mConfiguration file not found: ${filePath.replaceFirst("", "null")}\x1B[0m');
     }
   }
 
